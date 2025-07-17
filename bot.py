@@ -129,6 +129,10 @@ async def remove_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Ошибка при удалении вопроса: {e}")
         await update.message.reply_text("❗ Произошла ошибка при удалении вопроса.")
 
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Отменено.")
+    return ConversationHandler.END
+
 # === Main ===
 def main():
     token = os.environ.get("BOT_TOKEN")
