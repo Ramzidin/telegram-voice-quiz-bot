@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 
 # ==== CONFIG ====
-ADMIN_USER_IDS = [5070028239]
+ADMIN_USER_IDS = [5070028239, 7903173583]
 QUESTIONS_FILE = 'questions.json'
 # ===============
 
