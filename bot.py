@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 
 # ==== CONFIG ====
-ADMIN_USERNAMES = ['@star_none', '@rus_tili_akademiyasi_admin']
+ADMIN_USERNAMES = ['5070028239']
 QUESTIONS_FILE = 'questions.json'
 # ===============
 
