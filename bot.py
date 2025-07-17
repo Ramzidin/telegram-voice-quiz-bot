@@ -9,7 +9,7 @@ from telegram.ext import (
 )
 
 # ==== CONFIG ====
-ADMIN_USERNAMES = ['@star_none', '@rus_tili_akademiyasi_admin']
+ADMIN_USER_IDS = [5070028239]
 QUESTIONS_FILE = 'questions.json'
 # ===============
 
@@ -55,26 +55,41 @@ async def get_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📝 Ваш вопрос:\n\n{question}\n\n🎤 Отправьте голосовое сообщение с ответом.")
     return WAIT_VOICE
 
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     voice: Voice = update.message.voice
+    if not voice:
+        await update.message.reply_text("❗ Пожалуйста, отправьте голосовое сообщение.")
+        return WAIT_VOICE
+
     user_info = context.user_data
+    # Use .get() to avoid KeyError if any field is missing
+    name = user_info.get('name', 'Неизвестно')
+    group = user_info.get('group', 'Неизвестно')
+    question = user_info.get('question', 'Неизвестно')
+
     caption = (
         f"🎓 Ответ от студента:\n"
-        f"👤 Имя: {user_info['name']}\n"
-        f"🏫 Группа: {user_info['group']}\n"
-        f"❓ Вопрос: {user_info['question']}"
+        f"👤 Имя: {name}\n"
+        f"🏫 Группа: {group}\n"
+        f"❓ Вопрос: {question}"
     )
 
-    # Forward voice to all admins
-    for admin in ADMIN_USERNAMES:
-        await context.bot.send_voice(chat_id=admin, voice=voice.file_id, caption=caption)
+    # Forward voice to all admins by user ID
+    for admin_id in ADMIN_USER_IDS:
+        try:
+            await context.bot.send_voice(chat_id=admin_id, voice=voice.file_id, caption=caption)
+        except Exception as e:
+            logger.error(f"Ошибка отправки голосового сообщения админу {admin_id}: {e}")
 
     await update.message.reply_text("✅ Ваш ответ отправлен преподавателю. Спасибо!")
     return ConversationHandler.END
 
 # === Admin Commands ===
 async def add_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.username not in [u[1:] for u in ADMIN_USERNAMES]:
+    # Use user ID for admin check
+    if update.message.from_user.id not in ADMIN_USER_IDS:
+        await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     q = ' '.join(context.args)
     if not q:
@@ -86,7 +101,8 @@ async def add_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Вопрос добавлен.")
 
 async def list_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.username not in [u[1:] for u in ADMIN_USERNAMES]:
+    if update.message.from_user.id not in ADMIN_USER_IDS:
+        await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     questions = load_questions()
     if not questions:
@@ -96,24 +112,31 @@ async def list_questions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📋 Вопросы:\n{msg}")
 
 async def remove_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.username not in [u[1:] for u in ADMIN_USERNAMES]:
+    if update.message.from_user.id not in ADMIN_USER_IDS:
+        await update.message.reply_text("⛔ У вас нет прав для этой команды.")
         return
     try:
         idx = int(context.args[0]) - 1
         questions = load_questions()
+        if idx < 0 or idx >= len(questions):
+            raise IndexError
         removed = questions.pop(idx)
         save_questions(questions)
         await update.message.reply_text(f"🗑 Удалено: {removed}")
-    except:
+    except (IndexError, ValueError):
         await update.message.reply_text("❗ Использование: /removequestion номер_вопроса")
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❌ Отменено.")
-    return ConversationHandler.END
+    except Exception as e:
+        logger.error(f"Ошибка при удалении вопроса: {e}")
+        await update.message.reply_text("❗ Произошла ошибка при удалении вопроса.")
 
 # === Main ===
 def main():
     token = os.environ.get("BOT_TOKEN")
+    if not token:
+        logger.error("❌ BOT_TOKEN не найден в переменных окружения!")
+        print("❌ BOT_TOKEN не найден в переменных окружения!")
+        return
+
     app = ApplicationBuilder().token(token).build()
 
     conv_handler = ConversationHandler(
